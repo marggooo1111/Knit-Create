@@ -1,0 +1,2413 @@
+from flask import Flask, request, jsonify
+import os
+
+app = Flask(__name__)
+
+HTML = r"""
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Knit & Create</title>
+
+    <style>
+        :root {
+            --bg: #eee5d9;
+            --paper: #f9f5ee;
+            --card: #fffaf3;
+            --green: #435744;
+            --green-light: #e0e4d7;
+            --text: #292b25;
+            --muted: #888477;
+            --border: #e5dbce;
+            --pink: #d8b6ad;
+            --shadow: 0 4px 18px rgba(70, 53, 37, .07);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 14px;
+        }
+
+        button,
+        input,
+        select,
+        textarea {
+            font: inherit;
+        }
+
+        button {
+            cursor: pointer;
+        }
+
+        button,
+        input,
+        select,
+        textarea {
+            outline-color: var(--green);
+        }
+
+        img {
+            max-width: 100%;
+        }
+
+        .app {
+            max-width: 1600px;
+            min-height: 100vh;
+            margin: auto;
+            background: var(--paper);
+        }
+
+        /* TOP BAR */
+
+        .topbar {
+            height: 64px;
+            padding: 0 32px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: var(--paper);
+            border-bottom: 1px solid var(--border);
+            position: sticky;
+            top: 0;
+            z-index: 20;
+        }
+
+        .brand {
+            font-family: Georgia, serif;
+            font-size: 25px;
+            color: var(--green);
+            white-space: nowrap;
+        }
+
+        .brand span {
+            color: var(--pink);
+        }
+
+        .search-top {
+            width: 40%;
+            max-width: 460px;
+            padding: 12px 17px;
+            border-radius: 30px;
+            border: 1px solid var(--border);
+            background: #f0e9df;
+        }
+
+        .top-actions {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .icon-button {
+            border: none;
+            background: transparent;
+            font-size: 21px;
+        }
+
+        .avatar {
+            width: 38px;
+            height: 38px;
+            border-radius: 50%;
+            background: var(--green-light);
+            display: grid;
+            place-items: center;
+            overflow: hidden;
+        }
+
+        /* LAYOUT */
+
+        .layout {
+            display: grid;
+            grid-template-columns: 225px minmax(0, 1fr);
+            min-height: calc(100vh - 64px);
+        }
+
+        .sidebar {
+            padding: 25px 15px;
+            border-right: 1px solid var(--border);
+            background: #f5eee5;
+        }
+
+        .sidebar-label {
+            color: var(--muted);
+            font-size: 10px;
+            letter-spacing: 2px;
+            margin: 10px 10px 15px;
+        }
+
+        .nav-button {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            width: 100%;
+            border: none;
+            padding: 13px 12px;
+            margin-bottom: 5px;
+            border-radius: 12px;
+            background: transparent;
+            color: var(--text);
+            text-align: left;
+            transition: .2s;
+        }
+
+        .nav-button:hover {
+            background: #e8e2d6;
+        }
+
+        .nav-button.active {
+            background: var(--green);
+            color: white;
+        }
+
+        .nav-icon {
+            width: 22px;
+            text-align: center;
+            font-size: 18px;
+        }
+
+        .content {
+            min-width: 0;
+            padding: 25px;
+        }
+
+        /* PAGE SWITCHING */
+
+        .page {
+            display: none;
+        }
+
+        .page.active {
+            display: block;
+            animation: fadeIn .25s ease;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(5px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .page-title {
+            font-family: Georgia, serif;
+            font-weight: normal;
+            font-size: 30px;
+            margin-bottom: 8px;
+        }
+
+        .page-subtitle {
+            color: var(--muted);
+            line-height: 1.6;
+            margin-bottom: 23px;
+        }
+
+        /* BUTTONS */
+
+        .primary-button {
+            background: var(--green);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            padding: 12px 20px;
+            transition: .2s;
+        }
+
+        .primary-button:hover {
+            background: #314432;
+            transform: translateY(-1px);
+        }
+
+        .light-button {
+            border: 1px solid var(--border);
+            background: #f5efe6;
+            color: var(--text);
+            padding: 10px 15px;
+            border-radius: 22px;
+        }
+
+        .full-button {
+            width: 100%;
+        }
+
+        /* HERO */
+
+        .hero {
+            min-height: 245px;
+            border-radius: 19px;
+            padding: 32px;
+            margin-bottom: 27px;
+            color: white;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            background:
+                linear-gradient(90deg,
+                    rgba(30, 35, 25, .82),
+                    rgba(30, 35, 25, .13)),
+                url("https://images.unsplash.com/photo-1452860606245-08befc0ff44b?auto=format&fit=crop&w=1400&q=85") center 50% / cover;
+        }
+
+        .hero-content {
+            max-width: 450px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .hero-eyebrow {
+            font-size: 10px;
+            letter-spacing: 3px;
+            margin-bottom: 16px;
+            color: #e8dcc9;
+        }
+
+        .hero h1 {
+            font-family: Georgia, serif;
+            font-size: clamp(32px, 4vw, 48px);
+            font-weight: normal;
+            line-height: 1.15;
+            margin-bottom: 12px;
+        }
+
+        .hero p {
+            color: #f3e9dc;
+            line-height: 1.6;
+            margin-bottom: 18px;
+        }
+
+        /* SECTION HEADINGS */
+
+        .section-heading {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin: 27px 0 16px;
+        }
+
+        .section-heading h2 {
+            font-family: Georgia, serif;
+            font-size: 23px;
+            font-weight: normal;
+        }
+
+        .muted {
+            color: var(--muted);
+        }
+
+        /* FILTERS */
+
+        .filters {
+            display: flex;
+            gap: 8px;
+            overflow-x: auto;
+            padding: 3px 0 13px;
+            margin-bottom: 10px;
+        }
+
+        .filter {
+            flex-shrink: 0;
+            border: 1px solid var(--border);
+            border-radius: 25px;
+            padding: 9px 15px;
+            background: #f1eae0;
+            color: var(--text);
+            font-size: 12px;
+        }
+
+        .filter.active,
+        .filter:hover {
+            background: var(--green);
+            color: white;
+            border-color: var(--green);
+        }
+
+        /* PHOTO GRIDS */
+
+        .photo-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 17px;
+        }
+
+        .photo-card {
+            min-width: 0;
+            overflow: hidden;
+            border: 1px solid var(--border);
+            border-radius: 15px;
+            background: var(--card);
+            box-shadow: var(--shadow);
+            transition: transform .2s;
+        }
+
+        .photo-card:hover {
+            transform: translateY(-3px);
+        }
+
+        .photo-wrap {
+            position: relative;
+            height: 180px;
+            overflow: hidden;
+            background: #e6ded1;
+        }
+
+        .photo-wrap img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+            transition: transform .35s;
+        }
+
+        .photo-card:hover .photo-wrap img {
+            transform: scale(1.04);
+        }
+
+        .heart-button {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 33px;
+            height: 33px;
+            border-radius: 50%;
+            border: none;
+            background: rgba(255, 250, 243, .93);
+            color: #66584b;
+            font-size: 20px;
+            z-index: 2;
+        }
+
+        .heart-button.saved {
+            color: #b56e69;
+        }
+
+        .photo-info {
+            padding: 13px;
+        }
+
+        .photo-info h3 {
+            font-size: 14px;
+            margin-bottom: 7px;
+        }
+
+        .photo-info p {
+            color: var(--muted);
+            font-size: 12px;
+            line-height: 1.6;
+        }
+
+        .badge {
+            display: inline-block;
+            background: var(--green-light);
+            color: var(--green);
+            padding: 6px 9px;
+            border-radius: 20px;
+            font-size: 10px;
+            margin-top: 9px;
+        }
+
+        /* FEATURE CARDS */
+
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 13px;
+        }
+
+        .feature-card {
+            min-height: 100px;
+            padding: 17px;
+            border-radius: 14px;
+            border: 1px solid var(--border);
+            background: #fffaf3;
+            display: flex;
+            align-items: center;
+            gap: 13px;
+            text-align: left;
+        }
+
+        .feature-card:hover {
+            background: #f0e9df;
+        }
+
+        .feature-icon {
+            width: 43px;
+            height: 43px;
+            display: grid;
+            place-items: center;
+            border-radius: 12px;
+            background: var(--green-light);
+            font-size: 22px;
+            flex-shrink: 0;
+        }
+
+        .feature-card strong {
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .feature-card small {
+            color: var(--muted);
+            line-height: 1.4;
+        }
+
+        /* RESUME CARD */
+
+        .resume-card {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            padding: 13px;
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 15px;
+        }
+
+        .resume-card img {
+            width: 100px;
+            height: 95px;
+            border-radius: 10px;
+            object-fit: cover;
+        }
+
+        .resume-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .resume-info h3 {
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+
+        .resume-info p {
+            font-size: 11px;
+            color: var(--muted);
+            margin-bottom: 10px;
+        }
+
+        .progress-track {
+            height: 6px;
+            border-radius: 10px;
+            background: #e6e1d8;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            border-radius: 10px;
+            background: var(--green);
+        }
+
+        /* FORMS */
+
+        .form {
+            max-width: 680px;
+            display: grid;
+            gap: 15px;
+        }
+
+        .form label {
+            display: grid;
+            gap: 7px;
+            font-size: 13px;
+        }
+
+        .form input,
+        .form select,
+        .form textarea {
+            width: 100%;
+            padding: 12px 13px;
+            border: 1px solid var(--border);
+            border-radius: 11px;
+            background: #fffdf9;
+            color: var(--text);
+        }
+
+        .form textarea {
+            min-height: 110px;
+            resize: vertical;
+        }
+
+        .form input:focus,
+        .form select:focus,
+        .form textarea:focus {
+            border-color: var(--green);
+        }
+
+        /* RESULTS */
+
+        .result-box {
+            margin-top: 20px;
+            padding: 20px;
+            border-radius: 15px;
+            background: white;
+            border: 1px solid var(--border);
+            line-height: 1.8;
+            overflow-wrap: anywhere;
+        }
+
+        .result-box h2 {
+            font-family: Georgia, serif;
+            font-weight: normal;
+            margin-bottom: 12px;
+        }
+
+        /* LIST ITEMS */
+
+        .list-item {
+            display: flex;
+            gap: 13px;
+            align-items: center;
+            padding: 14px;
+            border: 1px solid var(--border);
+            background: white;
+            border-radius: 13px;
+            margin-bottom: 10px;
+        }
+
+        .list-item img {
+            width: 75px;
+            height: 75px;
+            object-fit: cover;
+            border-radius: 10px;
+        }
+
+        .list-item-main {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .list-item-main h3 {
+            font-size: 14px;
+            margin-bottom: 6px;
+        }
+
+        .list-item-main p {
+            color: var(--muted);
+            font-size: 12px;
+            line-height: 1.6;
+        }
+
+        .delete-button {
+            border: none;
+            background: #f4e5e0;
+            color: #8c514a;
+            border-radius: 18px;
+            padding: 8px 10px;
+            font-size: 11px;
+        }
+
+        .empty-state {
+            padding: 30px 20px;
+            text-align: center;
+            border: 1px dashed #d6cabc;
+            border-radius: 15px;
+            color: var(--muted);
+            line-height: 1.7;
+        }
+
+        /* PATTERN DETAIL */
+
+        .detail-layout {
+            display: grid;
+            grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+            gap: 23px;
+        }
+
+        .detail-photo {
+            width: 100%;
+            height: 440px;
+            object-fit: cover;
+            border-radius: 17px;
+            background: #e4dacc;
+        }
+
+        .detail-panel {
+            padding: 20px;
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 16px;
+        }
+
+        .detail-panel h2 {
+            font-family: Georgia, serif;
+            font-weight: normal;
+            font-size: 25px;
+            margin-bottom: 12px;
+        }
+
+        .detail-stats {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 8px;
+            margin: 18px 0;
+        }
+
+        .detail-stat {
+            padding: 12px 6px;
+            border-radius: 10px;
+            text-align: center;
+            background: #f4efe7;
+        }
+
+        .detail-stat strong {
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .detail-stat small {
+            color: var(--muted);
+            font-size: 10px;
+        }
+
+        /* PHOTO SEARCH */
+
+        .upload-box {
+            padding: 28px;
+            text-align: center;
+            border: 1px dashed #cfc3b3;
+            border-radius: 15px;
+            background: #f8f2e9;
+        }
+
+        .upload-box input {
+            display: block;
+            max-width: 100%;
+            margin: 15px auto;
+        }
+
+        .upload-preview {
+            display: none;
+            max-width: 250px;
+            max-height: 250px;
+            margin: 15px auto 0;
+            border-radius: 12px;
+            object-fit: cover;
+        }
+
+        /* BOTTOM NAV */
+
+        .bottom-nav {
+            display: none;
+        }
+
+        /* RESPONSIVE */
+
+        @media (max-width: 1050px) {
+            .layout {
+                grid-template-columns: 190px minmax(0, 1fr);
+            }
+
+            .content {
+                padding: 20px;
+            }
+
+            .photo-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .photo-wrap {
+                height: 165px;
+            }
+        }
+
+        @media (max-width: 700px) {
+            .topbar {
+                height: 58px;
+                padding: 0 14px;
+                gap: 10px;
+            }
+
+            .brand {
+                font-size: 20px;
+            }
+
+            .search-top {
+                display: none;
+            }
+
+            .layout {
+                display: block;
+                padding-bottom: 65px;
+            }
+
+            .sidebar {
+                display: none;
+            }
+
+            .content {
+                padding: 15px;
+            }
+
+            .hero {
+                min-height: 260px;
+                padding: 23px;
+                background-position: center;
+            }
+
+            .hero h1 {
+                font-size: 34px;
+            }
+
+            .photo-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 10px;
+            }
+
+            .photo-wrap {
+                height: 145px;
+            }
+
+            .photo-info {
+                padding: 10px;
+            }
+
+            .photo-info h3 {
+                font-size: 12px;
+            }
+
+            .feature-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 8px;
+            }
+
+            .feature-card {
+                display: block;
+                padding: 12px;
+            }
+
+            .feature-icon {
+                margin-bottom: 9px;
+            }
+
+            .detail-layout {
+                grid-template-columns: 1fr;
+            }
+
+            .detail-photo {
+                height: 320px;
+            }
+
+            .bottom-nav {
+                position: fixed;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                height: 62px;
+                display: flex;
+                justify-content: space-around;
+                align-items: center;
+                background: rgba(249, 245, 238, .97);
+                border-top: 1px solid var(--border);
+                z-index: 30;
+                padding-bottom: env(safe-area-inset-bottom);
+            }
+
+            .bottom-nav button {
+                background: transparent;
+                border: none;
+                color: var(--muted);
+                font-size: 10px;
+                display: grid;
+                gap: 3px;
+                justify-items: center;
+            }
+
+            .bottom-nav button span {
+                font-size: 19px;
+            }
+
+            .bottom-nav button.active {
+                color: var(--green);
+            }
+
+            .resume-card img {
+                width: 80px;
+                height: 80px;
+            }
+
+            .page-title {
+                font-size: 27px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="app">
+
+        <header class="topbar">
+            <div class="brand">Knit <span>&</span> Create</div>
+
+            <input class="search-top" id="globalSearch" placeholder="Поиск схем, идей, узоров..."
+                onkeydown="if(event.key==='Enter') searchEverywhere()">
+
+            <div class="top-actions">
+                <button class="icon-button" onclick="showPage('planner')">♧</button>
+                <div class="avatar">🧶</div>
+            </div>
+        </header>
+
+        <div class="layout">
+
+            <aside class="sidebar">
+                <div class="sidebar-label">МОЁ ПРОСТРАНСТВО</div>
+
+                <button class="nav-button active" data-page="home" onclick="showPage('home')">
+                    <span class="nav-icon">⌂</span> Главная
+                </button>
+
+                <button class="nav-button" data-page="library" onclick="showPage('library')">
+                    <span class="nav-icon">▦</span> Библиотека схем
+                </button>
+
+                <button class="nav-button" data-page="ideas" onclick="showPage('ideas')">
+                    <span class="nav-icon">♡</span> Идеи и вдохновение
+                </button>
+
+                <button class="nav-button" data-page="projects" onclick="showPage('projects')">
+                    <span class="nav-icon">▤</span> Мои проекты
+                </button>
+
+                <button class="nav-button" data-page="yarn" onclick="showPage('yarn')">
+                    <span class="nav-icon">◉</span> Мой запас пряжи
+                </button>
+
+                <button class="nav-button" data-page="learn" onclick="showPage('learn')">
+                    <span class="nav-icon">▧</span> Обучение
+                </button>
+
+                <button class="nav-button" data-page="designer" onclick="showPage('designer')">
+                    <span class="nav-icon">✳</span> Конструктор моделей
+                </button>
+
+                <button class="nav-button" data-page="photo" onclick="showPage('photo')">
+                    <span class="nav-icon">⌕</span> Поиск по фото
+                </button>
+
+                <button class="nav-button" data-page="diary" onclick="showPage('diary')">
+                    <span class="nav-icon">▣</span> Дневник вязания
+                </button>
+
+                <button class="nav-button" data-page="tools" onclick="showPage('tools')">
+                    <span class="nav-icon">⊞</span> Счётчики и инструменты
+                </button>
+
+                <button class="nav-button" data-page="planner" onclick="showPage('planner')">
+                    <span class="nav-icon">▦</span> Планировщик
+                </button>
+
+                <button class="nav-button" data-page="favorites" onclick="showPage('favorites')">
+                    <span class="nav-icon">♡</span> Сохранённое
+                </button>
+
+                <button class="nav-button" data-page="profile" onclick="showPage('profile')">
+                    <span class="nav-icon">♙</span> Профиль
+                </button>
+            </aside>
+
+            <main class="content">
+                """
+
+                # Во второй части продолжится HTML: все страницы приложения.
+                # В третьей части будут JavaScript, Python-маршруты и запуск.
+                <!-- HOME PAGE -->
+
+                <section class="page active" id="home">
+
+                    <div class="hero">
+                        <div class="hero-content">
+                            <div class="hero-eyebrow">ТВОЁ ТВОРЧЕСКОЕ ПРОСТРАНСТВО</div>
+
+                            <h1>Вяжи.<br>Вдохновляйся.<br>Создавай.</h1>
+
+                            <p>Находи красивые схемы, сохраняй идеи и создавай вещи своими руками.</p>
+
+                            <button class="primary-button" onclick="showPage('library')">
+                                Исследовать схемы →
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="feature-grid">
+
+                        <button class="feature-card" onclick="showPage('projects')">
+                            <div class="feature-icon">🧶</div>
+                            <div>
+                                <strong>Мои проекты</strong>
+                                <small>Продолжай вязать</small>
+                            </div>
+                        </button>
+
+                        <button class="feature-card" onclick="showPage('library')">
+                            <div class="feature-icon">▦</div>
+                            <div>
+                                <strong>Библиотека схем</strong>
+                                <small>Одежда, игрушки, аксессуары</small>
+                            </div>
+                        </button>
+
+                        <button class="feature-card" onclick="showPage('ideas')">
+                            <div class="feature-icon">🌷</div>
+                            <div>
+                                <strong>Идеи и вдохновение</strong>
+                                <small>Красивые вещи и узоры</small>
+                            </div>
+                        </button>
+
+                        <button class="feature-card" onclick="showPage('yarn')">
+                            <div class="feature-icon">🧵</div>
+                            <div>
+                                <strong>Мой запас пряжи</strong>
+                                <small>Управляй материалами</small>
+                            </div>
+                        </button>
+
+                        <button class="feature-card" onclick="showPage('learn')">
+                            <div class="feature-icon">📚</div>
+                            <div>
+                                <strong>Обучение</strong>
+                                <small>Новые техники вязания</small>
+                            </div>
+                        </button>
+
+                        <button class="feature-card" onclick="showPage('designer')">
+                            <div class="feature-icon">✂️</div>
+                            <div>
+                                <strong>Конструктор моделей</strong>
+                                <small>Подбор схем и расчёты</small>
+                            </div>
+                        </button>
+
+                    </div>
+
+                    <div class="section-heading">
+                        <h2>Продолжить вязание</h2>
+                        <button class="light-button" onclick="showPage('projects')">
+                            Все проекты →
+                        </button>
+                    </div>
+
+                    <div id="homeProjects"></div>
+
+                    <div class="section-heading">
+                        <h2>Идеи для тебя</h2>
+                        <button class="light-button" onclick="showPage('ideas')">
+                            Смотреть все
+                        </button>
+                    </div>
+
+                    <div class="photo-grid" id="homeIdeas"></div>
+
+                </section>
+
+
+                <!-- LIBRARY -->
+
+                <section class="page" id="library">
+
+                    <h1 class="page-title">Библиотека схем</h1>
+
+                    <p class="page-subtitle">
+                        Ищи вдохновение, находи готовые схемы и сохраняй понравившиеся модели.
+                    </p>
+
+                    <form class="form" onsubmit="searchPatterns(event)">
+                        <label>
+                            Что хочешь связать?
+                            <input id="patternSearch" placeholder="Например, кардиган оверсайз..." required>
+                        </label>
+
+                        <label>
+                            Категория
+                            <select id="patternCategory">
+                                <option value="all">Все категории</option>
+                                <option value="Одежда">Одежда</option>
+                                <option value="Игрушки">Игрушки</option>
+                                <option value="Аксессуары">Аксессуары</option>
+                                <option value="Для дома">Для дома</option>
+                            </select>
+                        </label>
+
+                        <label>
+                            Инструмент
+                            <select id="patternTool">
+                                <option value="all">Любой инструмент</option>
+                                <option value="Спицы">Спицы</option>
+                                <option value="Крючок">Крючок</option>
+                            </select>
+                        </label>
+
+                        <button class="primary-button">🔎 Найти схемы</button>
+                    </form>
+
+                    <div id="patternSearchResults"></div>
+
+                    <div class="section-heading">
+                        <h2>Популярные категории</h2>
+                    </div>
+
+                    <div class="filters">
+                        <button class="filter active" onclick="filterCategory('all', this)">Все</button>
+                        <button class="filter" onclick="filterCategory('Одежда', this)">Одежда</button>
+                        <button class="filter" onclick="filterCategory('Игрушки', this)">Игрушки</button>
+                        <button class="filter" onclick="filterCategory('Аксессуары', this)">Аксессуары</button>
+                        <button class="filter" onclick="filterCategory('Для дома', this)">Для дома</button>
+                    </div>
+
+                    <div class="photo-grid" id="libraryGrid"></div>
+
+                </section>
+
+
+                <!-- IDEAS -->
+
+                <section class="page" id="ideas">
+
+                    <h1 class="page-title">Идеи и вдохновение</h1>
+
+                    <p class="page-subtitle">
+                        Подбирай модели по фотографиям, собирай коллекции и находи новые проекты.
+                    </p>
+
+                    <div class="filters">
+                        <button class="filter active" onclick="filterIdeas('all', this)">Все</button>
+                        <button class="filter" onclick="filterIdeas('Одежда', this)">Одежда</button>
+                        <button class="filter" onclick="filterIdeas('Сумки', this)">Сумки</button>
+                        <button class="filter" onclick="filterIdeas('Игрушки', this)">Игрушки</button>
+                        <button class="filter" onclick="filterIdeas('Декор', this)">Декор</button>
+                    </div>
+
+                    <div class="photo-grid" id="ideasGrid"></div>
+
+                </section>
+
+
+                <!-- PROJECTS -->
+
+                <section class="page" id="projects">
+
+                    <h1 class="page-title">Мои проекты</h1>
+
+                    <p class="page-subtitle">
+                        Храни все свои работы в одном месте и отмечай прогресс.
+                    </p>
+
+                    <form class="form" onsubmit="addProject(event)">
+
+                        <label>
+                            Название проекта
+                            <input id="projectName" placeholder="Например, бежевый кардиган" required>
+                        </label>
+
+                        <label>
+                            Фотография проекта
+                            <input id="projectImage" type="url" placeholder="Ссылка на фотографию (необязательно)">
+                        </label>
+
+                        <label>
+                            Описание
+                            <textarea id="projectDescription" placeholder="Размер, цвет, пряжа, заметки..."></textarea>
+                        </label>
+
+                        <label>
+                            Прогресс (%)
+                            <input id="projectProgress" type="number" min="0" max="100" value="0">
+                        </label>
+
+                        <button class="primary-button">＋ Новый проект</button>
+
+                    </form>
+
+                    <div class="section-heading">
+                        <h2>Мои работы</h2>
+                    </div>
+
+                    <div class="filters">
+                        <button class="filter active" onclick="filterProjects('all', this)">Все</button>
+                        <button class="filter" onclick="filterProjects('progress', this)">В процессе</button>
+                        <button class="filter" onclick="filterProjects('done', this)">Готовые</button>
+                    </div>
+
+                    <div id="projectsList"></div>
+
+                </section>
+
+
+                <!-- YARN -->
+
+                <section class="page" id="yarn">
+
+                    <h1 class="page-title">Мой запас пряжи</h1>
+
+                    <p class="page-subtitle">
+                        Записывай цвета, состав и количество мотков, чтобы планировать будущие работы.
+                    </p>
+
+                    <form class="form" onsubmit="addYarn(event)">
+
+                        <label>
+                            Название пряжи
+                            <input id="yarnName" placeholder="Например, Merino Gold" required>
+                        </label>
+
+                        <label>
+                            Цвет
+                            <input id="yarnColor" placeholder="Бежевый, розовый, серый..." required>
+                        </label>
+
+                        <label>
+                            Состав
+                            <input id="yarnMaterial" placeholder="Например, 100% шерсть">
+                        </label>
+
+                        <label>
+                            Количество мотков
+                            <input id="yarnAmount" type="number" min="1" value="1" required>
+                        </label>
+
+                        <label>
+                            Метраж одного мотка
+                            <input id="yarnMeters" type="number" min="0" placeholder="Например, 240">
+                        </label>
+
+                        <button class="primary-button">＋ Добавить пряжу</button>
+
+                    </form>
+
+                    <div class="section-heading">
+                        <h2>Мои материалы</h2>
+                    </div>
+
+                    <div id="yarnList"></div>
+
+                </section>
+
+
+                <!-- LEARNING -->
+
+                <section class="page" id="learn">
+
+                    <h1 class="page-title">Энциклопедия вязания</h1>
+
+                    <p class="page-subtitle">
+                        Изучай техники, узоры и полезные приёмы.
+                    </p>
+
+                    <div class="photo-grid">
+
+                        <article class="photo-card">
+                            <div class="photo-wrap">
+                                <img src="https://images.unsplash.com/photo-1452860606245-08befc0ff44b?auto=format&fit=crop&w=700&q=80"
+                                    alt="Материалы для рукоделия" loading="lazy">
+                            </div>
+                            <div class="photo-info">
+                                <h3>Основные петли</h3>
+                                <p>Лицевые, изнаночные петли и набор начального ряда.</p>
+                                <span class="badge">Для начинающих</span>
+                            </div>
+                        </article>
+
+                        <article class="photo-card">
+                            <div class="photo-wrap">
+                                <img src="https://images.unsplash.com/photo-1604881988758-f76ad2f7aac1?auto=format&fit=crop&w=700&q=80"
+                                    alt="Вязаная фактура" loading="lazy">
+                            </div>
+                            <div class="photo-info">
+                                <h3>Косы и араны</h3>
+                                <p>Рельефные узоры и переплетения петель.</p>
+                                <span class="badge">Средний уровень</span>
+                            </div>
+                        </article>
+
+                        <article class="photo-card">
+                            <div class="photo-wrap">
+                                <img src="https://images.unsplash.com/photo-1610701596007-11502861dcfa?auto=format&fit=crop&w=700&q=80"
+                                    alt="Ручная работа" loading="lazy">
+                            </div>
+                            <div class="photo-info">
+                                <h3>Соединение деталей</h3>
+                                <p>Как аккуратно собрать готовое изделие.</p>
+                                <span class="badge">Практика</span>
+                            </div>
+                        </article>
+
+                    </div>
+
+                </section>
+
+
+                <!-- MODEL DESIGNER -->
+
+                <section class="page" id="designer">
+
+                    <h1 class="page-title">Конструктор моделей</h1>
+
+                    <p class="page-subtitle">
+                        Опиши желаемую вещь. Приложение поможет искать готовые схемы и инструкции.
+                    </p>
+
+                    <form class="form" onsubmit="searchPatternsFromDesigner(event)">
+
+                        <label>
+                            Что хочешь связать?
+                            <textarea id="designerPrompt"
+                                placeholder="Например, длинный бежевый кардиган оверсайз с косами..."
+                                required></textarea>
+                        </label>
+
+                        <label>
+                            Уровень сложности
+                            <select id="designerLevel">
+                                <option>Любой</option>
+                                <option>Начинающий</option>
+                                <option>Средний</option>
+                                <option>Продвинутый</option>
+                            </select>
+                        </label>
+
+                        <label>
+                            Инструмент
+                            <select id="designerTool">
+                                <option>Любой</option>
+                                <option>Спицы</option>
+                                <option>Крючок</option>
+                            </select>
+                        </label>
+
+                        <button class="primary-button">
+                            🔎 Найти готовые схемы в интернете
+                        </button>
+
+                    </form>
+
+                    <div id="designerResults"></div>
+
+                </section>
+
+
+                <!-- PHOTO SEARCH -->
+
+                <section class="page" id="photo">
+
+                    <h1 class="page-title">Поиск по фото</h1>
+
+                    <p class="page-subtitle">
+                        Загрузи фотографию понравившейся вещи, чтобы использовать её как ориентир для поиска.
+                    </p>
+
+                    <div class="upload-box">
+
+                        <h2>📷 Загрузить фотографию</h2>
+
+                        <p class="muted">
+                            Выбери фотографию вязаного изделия на устройстве.
+                        </p>
+
+                        <input type="file" id="photoUpload" accept="image/*" onchange="previewPhoto(event)">
+
+                        <img id="photoPreview" class="upload-preview" alt="Предпросмотр фотографии">
+
+                        <button class="primary-button" onclick="searchByPhoto()">
+                            Найти похожие схемы
+                        </button>
+
+                    </div>
+
+                    <div id="photoSearchResults"></div>
+
+                </section>
+
+
+                <!-- DIARY -->
+
+                <section class="page" id="diary">
+
+                    <h1 class="page-title">Дневник вязания</h1>
+
+                    <p class="page-subtitle">
+                        Записывай, над чем работала, сколько времени потратила и что нужно сделать дальше.
+                    </p>
+
+                    <form class="form" onsubmit="addDiaryEntry(event)">
+
+                        <label>
+                            Проект
+                            <input id="diaryProject" placeholder="Название изделия" required>
+                        </label>
+
+                        <label>
+                            Дата
+                            <input id="diaryDate" type="date" required>
+                        </label>
+
+                        <label>
+                            Что сделано?
+                            <textarea id="diaryNotes" placeholder="Например, связала 24 ряда спинки..."
+                                required></textarea>
+                        </label>
+
+                        <label>
+                            Время работы (минуты)
+                            <input id="diaryMinutes" type="number" min="0" value="30">
+                        </label>
+
+                        <button class="primary-button">＋ Записать в дневник</button>
+
+                    </form>
+
+                    <div class="section-heading">
+                        <h2>Мои записи</h2>
+                    </div>
+
+                    <div id="diaryList"></div>
+
+                </section>
+
+
+                <!-- COUNTERS AND TOOLS -->
+
+                <section class="page" id="tools">
+
+                    <h1 class="page-title">Счётчики и инструменты</h1>
+
+                    <p class="page-subtitle">
+                        Считай ряды, отслеживай повторения и рассчитывай расход пряжи.
+                    </p>
+
+                    <div class="detail-panel">
+
+                        <h2>Счётчик рядов</h2>
+
+                        <div class="detail-stats">
+                            <div class="detail-stat">
+                                <strong id="rowCounter">0</strong>
+                                <small>Текущий ряд</small>
+                            </div>
+
+                            <div class="detail-stat">
+                                <strong id="repeatCounter">0</strong>
+                                <small>Повторения</small>
+                            </div>
+
+                            <div class="detail-stat">
+                                <strong id="goalCounter">20</strong>
+                                <small>Цель</small>
+                            </div>
+                        </div>
+
+                        <button class="primary-button" onclick="changeCounter('rowCounter', 1)">
+                            ＋ Следующий ряд
+                        </button>
+
+                        <button class="light-button" onclick="changeCounter('repeatCounter', 1)">
+                            ＋ Повтор
+                        </button>
+
+                        <button class="light-button" onclick="resetCounters()">
+                            Сбросить
+                        </button>
+
+                    </div>
+
+                    <div class="section-heading">
+                        <h2>Калькулятор петель</h2>
+                    </div>
+
+                    <form class="form" onsubmit="calculateStitches(event)">
+
+                        <label>
+                            Петель в образце шириной 10 см
+                            <input id="gaugeStitches" type="number" min="1" value="18" required>
+                        </label>
+
+                        <label>
+                            Ширина изделия в сантиметрах
+                            <input id="garmentWidth" type="number" min="1" value="54" required>
+                        </label>
+
+                        <label>
+                            Рядов в образце высотой 10 см
+                            <input id="gaugeRows" type="number" min="1" value="24" required>
+                        </label>
+
+                        <label>
+                            Длина изделия в сантиметрах
+                            <input id="garmentLength" type="number" min="1" value="60" required>
+                        </label>
+
+                        <button class="primary-button">Рассчитать</button>
+
+                    </form>
+
+                    <div id="stitchCalculation"></div>
+
+                </section>
+
+
+                <!-- PLANNER -->
+
+                <section class="page" id="planner">
+
+                    <h1 class="page-title">Планировщик</h1>
+
+                    <p class="page-subtitle">
+                        Создавай список задач и постепенно выполняй свои планы.
+                    </p>
+
+                    <form class="form" onsubmit="addTask(event)">
+
+                        <label>
+                            Новая задача
+                            <input id="taskInput" placeholder="Например, купить пряжу" required>
+                        </label>
+
+                        <label>
+                            Дата
+                            <input id="taskDate" type="date">
+                        </label>
+
+                        <button class="primary-button">＋ Новая задача</button>
+
+                    </form>
+
+                    <div class="section-heading">
+                        <h2>Мои задачи</h2>
+                    </div>
+
+                    <div id="taskList"></div>
+
+                </section>
+
+
+                <!-- FAVORITES -->
+
+                <section class="page" id="favorites">
+
+                    <h1 class="page-title">Сохранённое ♡</h1>
+
+                    <p class="page-subtitle">
+                        Здесь будут фотографии моделей, которые ты добавила в избранное.
+                    </p>
+
+                    <div class="photo-grid" id="favoritesGrid"></div>
+
+                </section>
+
+
+                <!-- PROFILE -->
+
+                <section class="page" id="profile">
+
+                    <h1 class="page-title">Мой профиль</h1>
+
+                    <div class="detail-panel">
+
+                        <h2>Моё творческое пространство</h2>
+
+                        <p class="muted">
+                            Здесь собраны твои проекты, сохранённые идеи и материалы.
+                        </p>
+
+                        <div class="detail-stats">
+
+                            <div class="detail-stat">
+                                <strong id="profileProjects">0</strong>
+                                <small>Проекты</small>
+                            </div>
+
+                            <div class="detail-stat">
+                                <strong id="profileFavorites">0</strong>
+                                <small>Избранное</small>
+                            </div>
+
+                            <div class="detail-stat">
+                                <strong id="profileYarn">0</strong>
+                                <small>Виды пряжи</small>
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                </section>
+
+
+                <!-- PATTERN DETAIL -->
+
+                <section class="page" id="patternDetail">
+
+                    <button class="light-button" onclick="showPage('library')">
+                        ← Назад к схемам
+                    </button>
+
+                    <div class="section-heading">
+                        <h1 class="page-title" id="detailTitle">Схема вязания</h1>
+                    </div>
+
+                    <div class="detail-layout">
+
+                        <img class="detail-photo" id="detailImage" src="" alt="Вязаное изделие">
+
+                        <div class="detail-panel">
+
+                            <h2 id="detailName">Модель</h2>
+
+                            <p class="muted" id="detailDescription"></p>
+
+                            <div class="detail-stats">
+
+                                <div class="detail-stat">
+                                    <strong id="detailLevel">—</strong>
+                                    <small>Сложность</small>
+                                </div>
+
+                                <div class="detail-stat">
+                                    <strong id="detailTool">—</strong>
+                                    <small>Инструмент</small>
+                                </div>
+
+                                <div class="detail-stat">
+                                    <strong id="detailTime">—</strong>
+                                    <small>Время</small>
+                                </div>
+
+                            </div>
+
+                            <button class="primary-button full-button" id="detailSourceButton"
+                                onclick="openPatternSource()">
+                                Открыть оригинальную схему
+                            </button>
+
+                            <button class="light-button full-button" style="margin-top:10px"
+                                onclick="saveCurrentPattern()">
+                                ♡ Сохранить в избранное
+                            </button>
+
+                        </div>
+
+                    </div>
+
+                </section>
+
+
+            </main>
+        </div>
+
+
+        <nav class="bottom-nav">
+
+            <button class="active" data-page="home" onclick="showPage('home')">
+                <span>⌂</span>Главная
+            </button>
+
+            <button data-page="library" onclick="showPage('library')">
+                <span>⌕</span>Поиск
+            </button>
+
+            <button data-page="projects" onclick="showPage('projects')">
+                <span>▤</span>Проекты
+            </button>
+
+            <button data-page="favorites" onclick="showPage('favorites')">
+                <span>♡</span>Сохранённое
+            </button>
+
+            <button data-page="profile" onclick="showPage('profile')">
+                <span>♙</span>Профиль
+            </button>
+
+        </nav>
+        """
+
+        # Конец HTML второй части.
+        # В третьей части добавим JavaScript и Python-код.
+        <script>
+            const PHOTO = {
+                cardigan: "https://images.unsplash.com/photo-1434389677669-e08b4cac3105?auto=format&fit=crop&w=900&q=85",
+                sweater: "https://images.unsplash.com/photo-1576566588028-4147f3842f27?auto=format&fit=crop&w=900&q=85",
+                yarn: "https://images.unsplash.com/photo-1452860606245-08befc0ff44b?auto=format&fit=crop&w=900&q=85",
+                flowers: "https://images.unsplash.com/photo-1490750967868-88aa4486c946?auto=format&fit=crop&w=900&q=85",
+                bag: "https://images.unsplash.com/photo-1544816155-12df9643f363?auto=format&fit=crop&w=900&q=85",
+                bear: "https://images.unsplash.com/photo-1559454403-b8fb88521f11?auto=format&fit=crop&w=900&q=85",
+                scarf: "https://images.unsplash.com/photo-1601924994987-69e26d50dc26?auto=format&fit=crop&w=900&q=85",
+                home: "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=900&q=85"
+            };
+
+            const patterns = [
+                {
+                    id: 1,
+                    title: "Кардиган оверсайз",
+                    category: "Одежда",
+                    tool: "Спицы",
+                    level: "Средний",
+                    time: "5–10 дней",
+                    image: PHOTO.cardigan,
+                    description: "Свободный кардиган для повседневного гардероба.",
+                    query: "oversized knitted cardigan free knitting pattern"
+                },
+                {
+                    id: 2,
+                    title: "Уютный свитер",
+                    category: "Одежда",
+                    tool: "Спицы",
+                    level: "Средний",
+                    time: "7–14 дней",
+                    image: PHOTO.sweater,
+                    description: "Базовый свитер с длинными рукавами.",
+                    query: "knitted sweater free knitting pattern"
+                },
+                {
+                    id: 3,
+                    title: "Плюшевый мишка",
+                    category: "Игрушки",
+                    tool: "Крючок",
+                    level: "Начинающий",
+                    time: "1–3 дня",
+                    image: PHOTO.bear,
+                    description: "Идея мягкой игрушки ручной работы.",
+                    query: "crochet teddy bear free amigurumi pattern"
+                },
+                {
+                    id: 4,
+                    title: "Вязаная сумка",
+                    category: "Аксессуары",
+                    tool: "Крючок",
+                    level: "Начинающий",
+                    time: "2–4 дня",
+                    image: PHOTO.bag,
+                    description: "Практичная сумка для повседневного использования.",
+                    query: "crochet bag free pattern"
+                },
+                {
+                    id: 5,
+                    title: "Тёплый шарф",
+                    category: "Аксессуары",
+                    tool: "Спицы",
+                    level: "Начинающий",
+                    time: "2–5 дней",
+                    image: PHOTO.scarf,
+                    description: "Шарф с простым повторяющимся узором.",
+                    query: "easy knitted scarf free pattern"
+                },
+                {
+                    id: 6,
+                    title: "Цветочные мотивы",
+                    category: "Декор",
+                    tool: "Крючок",
+                    level: "Средний",
+                    time: "1–2 дня",
+                    image: PHOTO.flowers,
+                    description: "Вдохновение для цветочных мотивов и украшений.",
+                    query: "crochet flower motif free pattern"
+                },
+                {
+                    id: 7,
+                    title: "Декор для дома",
+                    category: "Декор",
+                    tool: "Крючок",
+                    level: "Начинающий",
+                    time: "2–4 дня",
+                    image: PHOTO.home,
+                    description: "Идеи уютных вещей для дома.",
+                    query: "crochet home decor free pattern"
+                },
+                {
+                    id: 8,
+                    title: "Мягкая пряжа",
+                    category: "Материалы",
+                    tool: "Любой",
+                    level: "Начинающий",
+                    time: "—",
+                    image: PHOTO.yarn,
+                    description: "Подбор материалов для будущих проектов.",
+                    query: "yarn knitting project ideas"
+                }
+            ];
+
+            let favorites = JSON.parse(localStorage.getItem("knit_favorites") || "[]");
+            let projects = JSON.parse(localStorage.getItem("knit_projects") || "[]");
+            let yarns = JSON.parse(localStorage.getItem("knit_yarns") || "[]");
+            let tasks = JSON.parse(localStorage.getItem("knit_tasks") || "[]");
+            let diary = JSON.parse(localStorage.getItem("knit_diary") || "[]");
+            let currentPattern = null;
+            let currentCategory = "all";
+            let currentIdeaCategory = "all";
+            let currentProjectFilter = "all";
+            let rowCount = 0;
+            let repeatCount = 0;
+
+            function saveData() {
+                localStorage.setItem("knit_favorites", JSON.stringify(favorites));
+                localStorage.setItem("knit_projects", JSON.stringify(projects));
+                localStorage.setItem("knit_yarns", JSON.stringify(yarns));
+                localStorage.setItem("knit_tasks", JSON.stringify(tasks));
+                localStorage.setItem("knit_diary", JSON.stringify(diary));
+            }
+
+            function escapeHTML(value) {
+                return String(value ?? "").replace(/[&<>"']/g, char => ({
+                    "&": "&amp;",
+                    "<": "&lt;",
+                    ">": "&gt;",
+                    '"': "&quot;",
+                    "'": "&#039;"
+                })[char]);
+            }
+
+            function showPage(pageName) {
+                document.querySelectorAll(".page").forEach(page => {
+                    page.classList.toggle("active", page.id === pageName);
+                });
+
+                document.querySelectorAll(".nav-button, .bottom-nav button").forEach(button => {
+                    button.classList.toggle("active", button.dataset.page === pageName);
+                });
+
+                if (pageName === "favorites") renderFavorites();
+                if (pageName === "projects") renderProjects();
+                if (pageName === "yarn") renderYarn();
+                if (pageName === "planner") renderTasks();
+                if (pageName === "diary") renderDiary();
+                if (pageName === "profile") renderProfile();
+
+                window.scrollTo({ top: 0, behavior: "smooth" });
+            }
+
+            function photoCard(item) {
+                const saved = favorites.some(f => f.id === item.id);
+
+                return `
+    <article class="photo-card">
+        <div class="photo-wrap">
+            <img src="${escapeHTML(item.image)}"
+                 alt="${escapeHTML(item.title)}"
+                 loading="lazy"
+                 onerror="this.style.display='none';this.parentElement.style.background='#e5d9ca'">
+
+            <button class="heart-button ${saved ? "saved" : ""}"
+                    onclick="toggleFavorite(${item.id})"
+                    aria-label="Добавить в избранное">
+                ${saved ? "♥" : "♡"}
+            </button>
+        </div>
+
+        <div class="photo-info">
+            <h3>${escapeHTML(item.title)}</h3>
+            <p>${escapeHTML(item.description)}</p>
+            <span class="badge">${escapeHTML(item.category)}</span>
+            <button class="light-button"
+                    style="width:100%;margin-top:12px"
+                    onclick="openPattern(${item.id})">
+                Подробнее
+            </button>
+        </div>
+    </article>`;
+            }
+
+            function renderLibrary(category = currentCategory) {
+                currentCategory = category;
+
+                const list = patterns.filter(item =>
+                    category === "all" || item.category === category
+                );
+
+                document.getElementById("libraryGrid").innerHTML =
+                    list.length
+                        ? list.map(photoCard).join("")
+                        : '<div class="empty-state">Пока нет моделей в этой категории.</div>';
+            }
+
+            function renderIdeas(category = currentIdeaCategory) {
+                currentIdeaCategory = category;
+
+                const list = patterns.filter(item =>
+                    category === "all" ||
+                    item.category === category ||
+                    (category === "Сумки" && item.title.toLowerCase().includes("сум"))
+                );
+
+                document.getElementById("ideasGrid").innerHTML =
+                    list.map(photoCard).join("");
+            }
+
+            function filterCategory(category, button) {
+                document.querySelectorAll("#library .filter").forEach(item =>
+                    item.classList.remove("active")
+                );
+
+                button.classList.add("active");
+                renderLibrary(category);
+            }
+
+            function filterIdeas(category, button) {
+                document.querySelectorAll("#ideas .filter").forEach(item =>
+                    item.classList.remove("active")
+                );
+
+                button.classList.add("active");
+                renderIdeas(category);
+            }
+
+            function openPattern(id) {
+                currentPattern = patterns.find(item => item.id === id);
+                if (!currentPattern) return;
+
+                document.getElementById("detailTitle").textContent = currentPattern.title;
+                document.getElementById("detailName").textContent = currentPattern.title;
+                document.getElementById("detailImage").src = currentPattern.image;
+                document.getElementById("detailDescription").textContent = currentPattern.description;
+                document.getElementById("detailLevel").textContent = currentPattern.level;
+                document.getElementById("detailTool").textContent = currentPattern.tool;
+                document.getElementById("detailTime").textContent = currentPattern.time;
+
+                showPage("patternDetail");
+            }
+
+            function openPatternSource() {
+                if (!currentPattern) return;
+
+                const query = encodeURIComponent(currentPattern.query);
+                window.open(
+                    "https://www.google.com/search?q=" + query,
+                    "_blank",
+                    "noopener"
+                );
+            }
+
+            function toggleFavorite(id) {
+                const item = patterns.find(pattern => pattern.id === id);
+                if (!item) return;
+
+                const exists = favorites.some(favorite => favorite.id === id);
+
+                if (exists) {
+                    favorites = favorites.filter(favorite => favorite.id !== id);
+                } else {
+                    favorites.push(item);
+                }
+
+                saveData();
+                renderLibrary();
+                renderIdeas();
+                renderFavorites();
+                renderHome();
+                renderProfile();
+            }
+
+            function saveCurrentPattern() {
+                if (currentPattern) toggleFavorite(currentPattern.id);
+            }
+
+            function renderFavorites() {
+                const container = document.getElementById("favoritesGrid");
+
+                container.innerHTML = favorites.length
+                    ? favorites.map(photoCard).join("")
+                    : '<div class="empty-state">Здесь пока ничего нет.<br>Нажми ♡ на понравившейся модели.</div>';
+            }
+
+            function searchEverywhere() {
+                const input = document.getElementById("globalSearch").value.trim();
+                if (!input) return;
+
+                document.getElementById("patternSearch").value = input;
+                showPage("library");
+                searchPatterns();
+            }
+
+            async function searchPatterns(event) {
+                if (event) event.preventDefault();
+
+                const query = document.getElementById("patternSearch").value.trim();
+                const category = document.getElementById("patternCategory").value;
+                const tool = document.getElementById("patternTool").value;
+                const result = document.getElementById("patternSearchResults");
+
+                if (!query) return;
+
+                result.innerHTML = `
+        <div class="result-box">
+            Ищем готовые схемы в интернете…
+            <br><br>
+            <a target="_blank" rel="noopener"
+               href="https://www.google.com/search?q=${encodeURIComponent(query + " knitting pattern")}"
+               class="primary-button">
+                Открыть результаты поиска
+            </a>
+        </div>`;
+
+                const filtered = patterns.filter(item => {
+                    const categoryMatch = category === "all" || item.category === category;
+                    const toolMatch = tool === "all" || item.tool === tool;
+                    const words = query.toLowerCase().split(/\s+/);
+                    const text = (item.title + " " + item.description + " " + item.query).toLowerCase();
+                    return categoryMatch && toolMatch &&
+                        words.some(word => text.includes(word));
+                });
+
+                result.innerHTML += filtered.length
+                    ? `<div class="section-heading"><h2>Подходящие идеи</h2></div>
+           <div class="photo-grid">${filtered.map(photoCard).join("")}</div>`
+                    : `<p class="muted" style="margin-top:18px">
+            Встроенные идеи не совпали с запросом. Используй ссылку на поиск выше.
+           </p>`;
+            }
+
+            async function searchPatternsFromDesigner(event) {
+                event.preventDefault();
+
+                const prompt = document.getElementById("designerPrompt").value.trim();
+                const level = document.getElementById("designerLevel").value;
+                const tool = document.getElementById("designerTool").value;
+                const results = document.getElementById("designerResults");
+
+                if (!prompt) return;
+
+                results.innerHTML = `
+        <div class="result-box">
+            <h2>Ищем готовые схемы</h2>
+            <p>Открой результаты поиска и выбери подходящую инструкцию.</p>
+            <p style="margin:15px 0">
+                <a target="_blank" rel="noopener"
+                   class="primary-button"
+                   href="https://www.google.com/search?q=${encodeURIComponent(prompt + " " + tool + " knitting pattern " + level)}">
+                   🔎 Google
+                </a>
+                <a target="_blank" rel="noopener"
+                   class="light-button"
+                   href="https://www.google.com/search?tbm=isch&q=${encodeURIComponent(prompt + " knitted crochet")}"
+                   style="margin-left:8px">
+                   🖼️ Фотографии
+                </a>
+            </p>
+            <p class="muted">
+                Сначала проверяй, что схема действительно бесплатная или доступна на условиях автора.
+            </p>
+        </div>`;
+
+                try {
+                    const response = await fetch("/api/search", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ prompt, level, tool })
+                    });
+
+                    if (!response.ok) return;
+
+                    const data = await response.json();
+
+                    if (data.results && data.results.length) {
+                        results.innerHTML += `
+                <div class="section-heading"><h2>Найденные ссылки</h2></div>
+                ${data.results.map(item => `
+                    <div class="list-item">
+                        <div class="list-item-main">
+                            <h3>${escapeHTML(item.title)}</h3>
+                            <p>${escapeHTML(item.description || "")}</p>
+                            <a target="_blank" rel="noopener"
+                               href="${escapeHTML(item.url)}">Открыть оригинал →</a>
+                        </div>
+                    </div>
+                `).join("")}`;
+                    }
+                } catch (error) {
+                    console.log("Используем обычный поиск:", error);
+                }
+            }
+
+            function previewPhoto(event) {
+                const file = event.target.files[0];
+                const preview = document.getElementById("photoPreview");
+
+                if (!file) return;
+
+                if (!file.type.startsWith("image/")) {
+                    alert("Пожалуйста, выбери изображение.");
+                    return;
+                }
+
+                preview.src = URL.createObjectURL(file);
+                preview.style.display = "block";
+            }
+
+            function searchByPhoto() {
+                const file = document.getElementById("photoUpload").files[0];
+                const result = document.getElementById("photoSearchResults");
+
+                if (!file) {
+                    alert("Сначала загрузи фотографию.");
+                    return;
+                }
+
+                result.innerHTML = `
+        <div class="result-box">
+            <h2>Поиск похожих моделей</h2>
+            <p>Фотография загружена. Для поиска по содержимому изображения нужна отдельная система распознавания.</p>
+            <p style="margin-top:12px">
+                <a class="primary-button"
+                   target="_blank" rel="noopener"
+                   href="https://lens.google.com/">
+                   Открыть Google Lens
+                </a>
+            </p>
+            <p class="muted" style="margin-top:12px">
+                Открой Google Lens и выбери ту же фотографию, чтобы искать похожие изображения и страницы со схемами.
+            </p>
+        </div>`;
+            }
+
+            function addProject(event) {
+                event.preventDefault();
+
+                const project = {
+                    id: Date.now(),
+                    title: document.getElementById("projectName").value.trim(),
+                    image: document.getElementById("projectImage").value.trim() || PHOTO.yarn,
+                    description: document.getElementById("projectDescription").value.trim(),
+                    progress: Math.max(0, Math.min(100,
+                        Number(document.getElementById("projectProgress").value) || 0)),
+                    date: new Date().toLocaleDateString("ru-RU")
+                };
+
+                projects.unshift(project);
+                saveData();
+                event.target.reset();
+                document.getElementById("projectProgress").value = 0;
+                renderProjects();
+                renderHome();
+                renderProfile();
+            }
+
+            function renderProjects() {
+                const container = document.getElementById("projectsList");
+
+                let list = projects;
+
+                if (currentProjectFilter === "progress") {
+                    list = projects.filter(project => project.progress < 100);
+                }
+
+                if (currentProjectFilter === "done") {
+                    list = projects.filter(project => project.progress >= 100);
+                }
+
+                container.innerHTML = list.length ? list.map(project => `
+        <div class="list-item">
+            <img src="${escapeHTML(project.image)}" alt=""
+                 onerror="this.src='${PHOTO.yarn}'">
+            <div class="list-item-main">
+                <h3>${escapeHTML(project.title)}</h3>
+                <p>${escapeHTML(project.description || "Нет описания")}</p>
+                <p>Создано: ${escapeHTML(project.date)}</p>
+                <div class="progress-track" style="margin:9px 0">
+                    <div class="progress-fill" style="width:${project.progress}%"></div>
+                </div>
+                <p>${project.progress}% завершено</p>
+                <input type="range" min="0" max="100" value="${project.progress}"
+                       onchange="updateProjectProgress(${project.id}, this.value)">
+            </div>
+            <button class="delete-button" onclick="deleteProject(${project.id})">
+                Удалить
+            </button>
+        </div>
+    `).join("") : '<div class="empty-state">Пока нет проектов. Добавь свою первую работу выше.</div>';
+            }
+
+            function filterProjects(filter, button) {
+                currentProjectFilter = filter;
+
+                document.querySelectorAll("#projects .filter").forEach(item =>
+                    item.classList.remove("active")
+                );
+
+                button.classList.add("active");
+                renderProjects();
+            }
+
+            function updateProjectProgress(id, progress) {
+                const project = projects.find(item => item.id === id);
+                if (!project) return;
+
+                project.progress = Math.max(0, Math.min(100, Number(progress)));
+                saveData();
+                renderProjects();
+                renderHome();
+            }
+
+            function deleteProject(id) {
+                if (!confirm("Удалить этот проект?")) return;
+
+                projects = projects.filter(project => project.id !== id);
+                saveData();
+                renderProjects();
+                renderHome();
+                renderProfile();
+            }
+
+            function renderHome() {
+                const projectContainer = document.getElementById("homeProjects");
+
+                if (projects.length) {
+                    const project = projects[0];
+
+                    projectContainer.innerHTML = `
+            <div class="resume-card">
+                <img src="${escapeHTML(project.image)}" alt="">
+                <div class="resume-info">
+                    <h3>${escapeHTML(project.title)}</h3>
+                    <p>Прогресс: ${project.progress}%</p>
+                    <div class="progress-track">
+                        <div class="progress-fill" style="width:${project.progress}%"></div>
+                    </div>
+                </div>
+                <button class="light-button" onclick="showPage('projects')">Открыть</button>
+            </div>`;
+                } else {
+                    projectContainer.innerHTML = `
+            <div class="empty-state">
+                Твои проекты появятся здесь.
+                <br><br>
+                <button class="primary-button" onclick="showPage('projects')">
+                    ＋ Добавить проект
+                </button>
+            </div>`;
+                }
+
+                document.getElementById("homeIdeas").innerHTML =
+                    patterns.slice(0, 3).map(photoCard).join("");
+            }
+
+            function addYarn(event) {
+                event.preventDefault();
+
+                yarns.unshift({
+                    id: Date.now(),
+                    name: document.getElementById("yarnName").value.trim(),
+                    color: document.getElementById("yarnColor").value.trim(),
+                    material: document.getElementById("yarnMaterial").value.trim(),
+                    amount: Number(document.getElementById("yarnAmount").value),
+                    meters: Number(document.getElementById("yarnMeters").value) || 0
+                });
+
+                saveData();
+                event.target.reset();
+                renderYarn();
+                renderProfile();
+            }
+
+            function renderYarn() {
+                const container = document.getElementById("yarnList");
+
+                container.innerHTML = yarns.length ? yarns.map(item => `
+        <div class="list-item">
+            <div class="feature-icon">🧶</div>
+            <div class="list-item-main">
+                <h3>${escapeHTML(item.name)}</h3>
+                <p>Цвет: ${escapeHTML(item.color)}</p>
+                <p>Состав: ${escapeHTML(item.material || "Не указан")}</p>
+                <p>${item.amount} мот. ${item.meters ? "· " + item.meters + " м каждый" : ""}</p>
+            </div>
+            <button class="delete-button" onclick="deleteYarn(${item.id})">Удалить</button>
+        </div>
+    `).join("") : '<div class="empty-state">Добавь пряжу, которая у тебя есть.</div>';
+            }
+
+            function deleteYarn(id) {
+                yarns = yarns.filter(item => item.id !== id);
+                saveData();
+                renderYarn();
+                renderProfile();
+            }
+
+            function addTask(event) {
+                event.preventDefault();
+
+                tasks.unshift({
+                    id: Date.now(),
+                    title: document.getElementById("taskInput").value.trim(),
+                    date: document.getElementById("taskDate").value,
+                    done: false
+                });
+
+                saveData();
+                event.target.reset();
+                renderTasks();
+            }
+
+            function renderTasks() {
+                const container = document.getElementById("taskList");
+
+                container.innerHTML = tasks.length ? tasks.map(task => `
+        <div class="list-item">
+            <input type="checkbox" ${task.done ? "checked" : ""}
+                   onchange="toggleTask(${task.id})">
+            <div class="list-item-main" style="${task.done ? "text-decoration:line-through;opacity:.6" : ""}">
+                <h3>${escapeHTML(task.title)}</h3>
+                <p>${escapeHTML(task.date || "Дата не указана")}</p>
+            </div>
+            <button class="delete-button" onclick="deleteTask(${task.id})">Удалить</button>
+        </div>
+    `).join("") : '<div class="empty-state">Пока нет задач.</div>';
+            }
+
+            function toggleTask(id) {
+                const task = tasks.find(item => item.id === id);
+                if (!task) return;
+
+                task.done = !task.done;
+                saveData();
+                renderTasks();
+            }
+
+            function deleteTask(id) {
+                tasks = tasks.filter(task => task.id !== id);
+                saveData();
+                renderTasks();
+            }
+
+            function addDiaryEntry(event) {
+                event.preventDefault();
+
+                diary.unshift({
+                    id: Date.now(),
+                    project: document.getElementById("diaryProject").value.trim(),
+                    date: document.getElementById("diaryDate").value,
+                    notes: document.getElementById("diaryNotes").value.trim(),
+                    minutes: Number(document.getElementById("diaryMinutes").value) || 0
+                });
+
+                saveData();
+                event.target.reset();
+                document.getElementById("diaryDate").valueAsDate = new Date();
+                renderDiary();
+            }
+
+            function renderDiary() {
+                const container = document.getElementById("diaryList");
+
+                container.innerHTML = diary.length ? diary.map(entry => `
+        <div class="list-item">
+            <div class="list-item-main">
+                <h3>${escapeHTML(entry.project)}</h3>
+                <p>${escapeHTML(entry.date)} · ${entry.minutes} мин.</p>
+                <p>${escapeHTML(entry.notes)}</p>
+            </div>
+            <button class="delete-button" onclick="deleteDiary(${entry.id})">Удалить</button>
+        </div>
+    `).join("") : '<div class="empty-state">Твои записи появятся здесь.</div>';
+            }
+
+            function deleteDiary(id) {
+                diary = diary.filter(entry => entry.id !== id);
+                saveData();
+                renderDiary();
+            }
+
+            function changeCounter(id, amount) {
+                const element = document.getElementById(id);
+                element.textContent = Math.max(0, Number(element.textContent) + amount);
+            }
+
+            function resetCounters() {
+                document.getElementById("rowCounter").textContent = "0";
+                document.getElementById("repeatCounter").textContent = "0";
+            }
+
+            function calculateStitches(event) {
+                event.preventDefault();
+
+                const gaugeStitches = Number(document.getElementById("gaugeStitches").value);
+                const width = Number(document.getElementById("garmentWidth").value);
+                const gaugeRows = Number(document.getElementById("gaugeRows").value);
+                const length = Number(document.getElementById("garmentLength").value);
+
+                const stitches = Math.round(gaugeStitches * width / 10);
+                const rows = Math.round(gaugeRows * length / 10);
+
+                document.getElementById("stitchCalculation").innerHTML = `
+        <div class="result-box">
+            <h2>Результат расчёта</h2>
+            <p>Примерно <strong>${stitches} петель</strong> по ширине.</p>
+            <p>Примерно <strong>${rows} рядов</strong> по длине.</p>
+            <p class="muted" style="margin-top:12px">
+                Это ориентировочный расчёт. Учитывай раппорт узора, припуски
+                и плотность вязания после ВТО.
+            </p>
+        </div>`;
+            }
+
+            function renderProfile() {
+                document.getElementById("profileProjects").textContent = projects.length;
+                document.getElementById("profileFavorites").textContent = favorites.length;
+                document.getElementById("profileYarn").textContent = yarns.length;
+            }
+
+            function searchContent() {
+                const query = document.getElementById("globalSearch").value.toLowerCase().trim();
+                if (!query) return;
+
+                const matches = patterns.filter(item =>
+                    (item.title + " " + item.description + " " + item.category)
+                        .toLowerCase().includes(query)
+                );
+
+                document.getElementById("libraryGrid").innerHTML =
+                    matches.map(photoCard).join("");
+            }
+
+            document.addEventListener("DOMContentLoaded", () => {
+                renderLibrary();
+                renderIdeas();
+                renderHome();
+                renderProjects();
+                renderYarn();
+                renderTasks();
+                renderDiary();
+                renderFavorites();
+                renderProfile();
+
+                document.getElementById("diaryDate").valueAsDate = new Date();
+            });
+        </script>
+        """
+
+        @app.route("/")
+        def index():
+        return Response(HTML, mimetype="text/html")
+
+
+        @app.route("/api/search", methods=["POST"])
+        def search_patterns():
+        data = request.get_json(silent=True) or {}
+        prompt = str(data.get("prompt", "")).strip()
+        level = str(data.get("level", "Любой"))
+        tool = str(data.get("tool", "Любой"))
+
+        if not prompt:
+        return jsonify({"results": []})
+
+        # Без поискового API сайт всё равно открывает обычный поиск Google.
+        # Этот endpoint не выдумывает ссылки на несуществующие схемы.
+        return jsonify({"results": []})
+
+
+        if __name__ == "__main__":
+        app.run(debug=True)
